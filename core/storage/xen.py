@@ -69,23 +69,25 @@ class XenStorage(QubesVmStorage):
             return self.format_disk_dev(
                 "%s:%s" % (self.root_img, self.rootcow_img),
                 "block-origin", self.root_dev, True)
-        elif self.vm.template:
-            if not self.vm.template.storage.rootcow_img:
-                # HVM template-based VM - template doesn't have own
-                # root-cow.img, only one device-mapper layer
-                return self.format_disk_dev("%s:%s" % (
-                    self.vm.template.root_img, self.vm.volatile_img),
-                    "block-snapshot", self.root_dev, True)
-            else:
-                # any other template-based VM - two device-mapper layers: one
-                # in dom0 (here) from root+root-cow, and another one from
-                # this+volatile.img
-                return self.format_disk_dev("%s:%s" % (
-                    self.vm.template.root_img, self.vm.template.rootcow_img),
-                    "block-snapshot", self.root_dev, False)
         else:
             return self.format_disk_dev(self.root_img, None,
                                         self.root_dev, True)
+
+    def root_snapshot_config(self, vm):
+        source_template = vm.template
+        if not source_template.storage.rootcow_img:
+            # HVM template-based VM - template doesn't have own
+            # root-cow.img, only one device-mapper layer
+            return self.format_disk_dev("%s:%s" % (
+                source_template.root_img, vm.volatile_img),
+                "block-snapshot", vm.storage.root_dev, True)
+        else:
+            # any other template-based VM - two device-mapper layers: one
+            # in dom0 (here) from root+root-cow, and another one from
+            # this+volatile.img
+            return self.format_disk_dev("%s:%s" % (
+                source_template.root_img, source_template.rootcow_img),
+                "block-snapshot", vm.storage.root_dev, False)
 
     def private_dev_config(self):
         return self.format_disk_dev(self.private_img, None,

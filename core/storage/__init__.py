@@ -90,7 +90,20 @@ class QubesVmStorage(object):
 
     def get_config_params(self):
         args = {}
-        args['rootdev'] = self.root_dev_config()
+        template = self.vm.template
+
+        if not template or self.vm.is_template():
+            # A template vm or an standalone vm
+            args['rootdev'] = self.root_dev_config()
+        elif template.pool_name == self.vm.pool_name:
+            # An AppVm or a template based HVM using the same pool as it
+            # template
+            args['rootdev'] = self.root_snapshot_config(self.vm)
+        else:
+            # An AppVm or a template based HVM using different pool as it
+            # template
+            args['rootdev'] = template.storage.root_snapshot_config(self.vm)
+
         args['privatedev'] = self.private_dev_config()
         args['volatiledev'] = self.volatile_dev_config()
         args['otherdevs'] = self.other_dev_config()
@@ -98,6 +111,11 @@ class QubesVmStorage(object):
         return args
 
     def root_dev_config(self):
+        raise NotImplementedError
+
+    def root_snapshot_config(self, vm):
+        """ Returns the path to a snapshot of the root of an templated based vm.
+        """
         raise NotImplementedError
 
     def private_dev_config(self):
