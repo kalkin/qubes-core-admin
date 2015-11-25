@@ -43,10 +43,10 @@ class TC_00_Storage(SystemTestsMixin, QubesTestCase):
         result = qubes.storage.load('qubes.storage.xen.XenStorage')
         self.assertTrue(result is XenStorage)
 
-    def test_002_default_pool_drivers(self):
-        """ The only predifined pool driver is xen """
+    def test_002_default_pool_types(self):
+        """ The only predifined pool type is xen """
         result = defaults['pool_drivers'].keys()
-        expected = ["xen"]
+        expected = ["xen", "lvm-thin"]
         self.assertEquals(result, expected)
 
     def test_003_get_pool_klass(self):

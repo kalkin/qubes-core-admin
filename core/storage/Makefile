@@ -20,5 +20,7 @@ ifneq ($(BACKEND_VMM),)
 	if [ -r $(BACKEND_VMM).py ]; then \
 		cp $(BACKEND_VMM).py $(DESTDIR)$(PYTHON_QUBESPATH)/storage && \
 		cp $(BACKEND_VMM).py[co] $(DESTDIR)$(PYTHON_QUBESPATH)/storage; \
+		cp lvm.py $(DESTDIR)$(PYTHON_QUBESPATH)/storage && \
+		cp lvm.py[co] $(DESTDIR)$(PYTHON_QUBESPATH)/storage; \
 	fi
 endif
