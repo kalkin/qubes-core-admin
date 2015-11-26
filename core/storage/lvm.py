@@ -30,7 +30,7 @@ import sys
 import time
 
 from qubes.qubes import QubesException
-from qubes.storage import Pool, QubesVmStorage
+from qubes.storage import Pool, QubesVmStorage, StoragePoolException
 
 log = logging.getLogger('qubes.lvm')
 
@@ -39,10 +39,152 @@ class ThinStorage(QubesVmStorage):
 
     def __init__(self, vm, vmdir, thin_pool, **kwargs):
         super(ThinStorage, self).__init__(vm, **kwargs)
-        self.private_img = LVM + vm.name + "-private"
-        if self.vm.is_updateable() or (self.vm.template and
-                                       self.vm.template.storage_type == "lvm"):
-            self.root_img = LVM + vm.name + "-root"
+        self.log = logging.getLogger('qubes.lvm.thin-storage')
+
+        self.thin_pool = thin_pool
+
+        self.root_img = self._volume_path(vm.name + "-root")
+        self.private_img = self._volume_path(vm.name + "-private")
+        self.volatile_img = self._volume_path(vm.name + "-volatile")
+
+    def _get_privatedev(self):
+        return "'phy:%s,%s,w'," % (self.private_img, self.private_dev)
+
+    def _get_rootdev(self):
+        if self.vm.is_updateable():
+            return "'phy:%s,%s,w'," % (self.root_img, self.root_dev)
+        elif self.vm.template:      # handle the the templates vms
+            if self.vm.template.storage_type == "lvm":
+                remove_volume(self.root_img)
+                create_snapshot(self.vm.template.root_img, self.root_img)
+                return "'phy:%s,%s,w'," % (self.root_img, self.root_dev)
+            else:
+                return super(ThinStorage, self)._get_rootdev()
+
+    def _volume_path(self, volume):
+        return os.path.abspath(
+            os.path.join('/dev/', self.thin_pool, os.pardir, volume))
+
+    def create_on_disk_root_img(self, verbose, source_template=None):
+        vmname = self.vm.name
+
+        if source_template is not None:
+            self.log.info("Snapshot %s for vm %s"
+                          % (source_template.root_img, vmname))
+            create_snapshot(source_template.root_img, self.root_img)
+        else:
+            self.log.info("Creating empty root img for %s" % vmname)
+            new_volume(self.thin_pool, self.root_img, self.root_img_size)
+
+    def create_on_disk_private_img(self, verbose, source_template=None):
+        vmname = self.vm.name
+        if source_template is not None:
+            self.log.info("Snapshot %s for vm %s"
+                          % (source_template.root_img, vmname))
+            create_snapshot(source_template.private_img, self.private_img)
+        else:
+            self.log.info("Creating empty private img for %s" % vmname)
+            new_volume(self.thin_pool, self.private_img, self.private_img_size)
+
+    def reset_volatile_storage(self, verbose=False, source_template=None):
+        if not os.path.exists(self.volatile_img):
+            volatile_img_size = 1024000000  # 1GB
+            new_volume(self.thin_pool, self.volatile_img, volatile_img_size)
+        cmd = ['sudo', 'mkswap', '-f', self.volatile_img]
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+        self.log.debug(output)
+
+    def verify_files(self):
+        self.log.debug("Verifying files")
+        if not os.path.exists(self.vmdir):
+            self.log.error("VM directory doesn't exist: %s" % self.vmdir)
+            raise QubesException("VM directory doesn't exist: {0}".
+                                 format(self.vmdir))
+
+        if self.root_img and not os.path.exists(self.root_img) and \
+                self.vm.is_updateable():
+            self.log.error("VM root image doesn't exist: %s" % self.root_img)
+            raise QubesException("VM root image file doesn't exist: {0}".
+                                 format(self.root_img))
+
+        if self.private_img and not os.path.exists(self.private_img):
+            self.log.error("VM private image doesn't exist: %s"
+                           % self.private_img)
+            raise QubesException("VM private image file doesn't exist: {0}".
+                                 format(self.private_img))
+        if self.modules_img is not None and \
+                not os.path.exists(self.modules_img):
+            self.log.error(
+                "VM modules image doesn't exist: %s" % self.modules_img)
+            raise QubesException(
+                "VM kernel modules image does not exists: {0}"
+                .format(self.modules_img)
+                )
+
+    def rename(self, old_name, new_name):
+        self.log.debug("Renaming %s to %s " % (old_name, new_name))
+        old_vmdir = self.vmdir
+        new_vmdir = os.path.join(os.path.dirname(self.vmdir), new_name)
+        os.rename(self.vmdir, new_vmdir)
+        self.vmdir = new_vmdir
+        if self.private_img:
+            self.private_img = rename_volume(
+                self.private_img, self._volume_path(new_name + "-private"))
+        if self.root_img:
+            if self.vm.is_updateable():
+                self.root_img = rename_volume(
+                    self.root_img, self._volume_path(new_name + "-root"))
+            else:
+                self.root_img = self.root_img.replace(old_vmdir, new_vmdir)
+        if self.volatile_img:
+            self.volatile_img = self.volatile_img.replace(old_vmdir, new_vmdir)
+
+    def remove_from_disk(self):
+        remove_volume(self.private_img)
+        remove_volume(self.volatile_img)
+        if self.vm.is_updateable() or self.vm.template.storage_type == "lvm":
+            remove_volume(self.root_img)
+        shutil.rmtree(self.vmdir)
+
+    def clone_disk_files(self, src_vm, verbose):
+        if verbose:
+            self.log.info("--> Creating directory: {0}".format(self.vmdir))
+        os.mkdir(self.vmdir)
+
+        if src_vm.private_img is not None and self.private_img is not None:
+            if verbose:
+                print("--> Snapshotting the private image:\n{0} ==>\n{1}".
+                      format(src_vm.private_img, self.private_img),
+                      file=sys.stderr)
+            create_snapshot(src_vm.private_img, self.private_img)
+
+        if src_vm.updateable and src_vm.root_img is not None and \
+                self.root_img is not None:
+            if verbose:
+                print("--> Copying the root image:\n{0} ==>\n{1}".
+                      format(src_vm.root_img, self.root_img),
+                      file=sys.stderr)
+            if src_vm.storage_type == "file":
+                self._copy_file(src_vm.root_img, self.root_img)
+            else:
+                create_snapshot(src_vm.root_img, self.root_img)
+            # TODO: modules?
+
+        clean_volatile_img = src_vm.dir_path + "/clean-volatile.img.tar"
+        if os.path.exists(clean_volatile_img):
+            self._copy_file(clean_volatile_img,
+                            self.vm.dir_path + "/clean-volatile.img.tar")
+
+    def commit_template_changes(self):
+        pass
+
+    def is_outdated(self):
+        if self.vm.is_template():
+            return lvm_image_changed(self.vm)
+        elif self.vm.is_appvm():
+            return self.vm.is_outdated()
+        else:
+            return False
 
 
 def lvm_image_changed(vm):
@@ -147,8 +289,13 @@ def rename_volume(old_name, new_name):
 class ThinPool(Pool):
     def __init__(self, vm, thin_pool=None, dir_path='/var/lib/qubes/'):
         super(ThinPool, self).__init__(vm, dir_path)
+
         if thin_pool is None:
             thin_pool = 'qubes_dom0/pool00'
+
+        if not thin_pool_exists(thin_pool):
+            raise StoragePoolException("LVM Thin Pool %s does not exist"
+                                       % thin_pool)
         self.thin_pool = thin_pool
 
     def getStorage(self):
