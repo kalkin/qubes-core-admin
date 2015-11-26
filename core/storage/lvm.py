@@ -21,20 +21,23 @@
 
 from __future__ import absolute_import, print_function
 
-from qubes.storage import Pool, QubesVmStorage
-import logging
-import subprocess
-import os
 import datetime
+import logging
+import os
+import shutil
+import subprocess
+import sys
 import time
 
+from qubes.qubes import QubesException
+from qubes.storage import Pool, QubesVmStorage
 
 log = logging.getLogger('qubes.lvm')
 
 
 class ThinStorage(QubesVmStorage):
 
-    def __init__(self, vm, **kwargs):
+    def __init__(self, vm, vmdir, thin_pool, **kwargs):
         super(ThinStorage, self).__init__(vm, **kwargs)
         self.private_img = LVM + vm.name + "-private"
         if self.vm.is_updateable() or (self.vm.template and
@@ -142,4 +145,11 @@ def rename_volume(old_name, new_name):
 
 
 class ThinPool(Pool):
-    pass
+    def __init__(self, vm, thin_pool=None, dir_path='/var/lib/qubes/'):
+        super(ThinPool, self).__init__(vm, dir_path)
+        if thin_pool is None:
+            thin_pool = 'qubes_dom0/pool00'
+        self.thin_pool = thin_pool
+
+    def getStorage(self):
+        return ThinStorage(self.vm, thin_pool=self.thin_pool, vmdir=self.vmdir)
