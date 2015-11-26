@@ -95,7 +95,7 @@ class QubesVmStorage(object):
         if not template or self.vm.is_template():
             # A template vm or an standalone vm
             args['rootdev'] = self.root_dev_config()
-        elif template.pool_name == self.vm.pool_name:
+        elif same_pool(template, self.vm):
             # An AppVm or a template based HVM using the same pool as it
             # template
             args['rootdev'] = self.root_snapshot_config(self.vm)
@@ -334,6 +334,10 @@ def get_pool(name, vm):
     return klass(vm, **kwargs)
 
 
+def same_pool(vm_a, vm_b):
+    return vm_a.pool_name == vm_b.pool_name
+
+
 def pool_exists(name):
     """ Check if the specified pool exists """
     try:
@@ -341,6 +345,7 @@ def pool_exists(name):
         return True
     except StoragePoolException:
         return False
+
 
 def add_pool(name, **kwargs):
     """ Add a storage pool to config."""
