@@ -403,6 +403,7 @@ class StoragePoolException(QubesException):
 
 
 class Pool(object):
+
     def __init__(self, vm, dir_path):
         assert vm is not None
         assert dir_path is not None

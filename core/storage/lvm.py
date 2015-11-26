@@ -47,19 +47,16 @@ class ThinStorage(QubesVmStorage):
         self.private_img = self._volume_path(vm.name + "-private")
         self.volatile_img = self._volume_path(vm.name + "-volatile")
 
-    def _get_privatedev(self):
-        return "'phy:%s,%s,w'," % (self.private_img, self.private_dev)
+    def root_dev_config(self):
+        return self.format_disk_dev(self.root_img, None, self.root_dev, True)
 
-    def _get_rootdev(self):
-        if self.vm.is_updateable():
-            return "'phy:%s,%s,w'," % (self.root_img, self.root_dev)
-        elif self.vm.template:      # handle the the templates vms
-            if self.vm.template.storage_type == "lvm":
-                remove_volume(self.root_img)
-                create_snapshot(self.vm.template.root_img, self.root_img)
-                return "'phy:%s,%s,w'," % (self.root_img, self.root_dev)
-            else:
-                return super(ThinStorage, self)._get_rootdev()
+    def private_dev_config(self):
+        return self.format_disk_dev(self.private_img, None,
+                                    self.private_dev, True)
+
+    def volatile_dev_config(self):
+        return self.format_disk_dev(self.volatile_img, None,
+                                    self.volatile_dev, True)
 
     def _volume_path(self, volume):
         return os.path.abspath(
