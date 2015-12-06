@@ -139,7 +139,7 @@ class ThinStorage(QubesVmStorage):
     def remove_from_disk(self):
         remove_volume(self.private_img)
         remove_volume(self.volatile_img)
-        if self.vm.is_updateable() or self.vm.template.storage_type == "lvm":
+        if self.vm.is_updateable() or same_pool(self.vm, self.vm.template):
             remove_volume(self.root_img)
         shutil.rmtree(self.vmdir)
 
