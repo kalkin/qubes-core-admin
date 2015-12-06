@@ -256,8 +256,11 @@ def remove_volume(img):
         except subprocess.CalledProcessError:
             successful = False
 
-        if not successful:
+        if successful:
+            break
+        else:
             time.sleep(tries)
+            tries += 1
 
     if not successful:
         log.error('Could not remove volume ' + img)
