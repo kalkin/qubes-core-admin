@@ -30,7 +30,7 @@ import sys
 import time
 
 from qubes.qubes import QubesException
-from qubes.storage import Pool, QubesVmStorage, StoragePoolException
+from qubes.storage import Pool, QubesVmStorage, StoragePoolException, same_pool
 
 log = logging.getLogger('qubes.lvm')
 
@@ -65,7 +65,11 @@ class ThinStorage(QubesVmStorage):
     def create_on_disk_root_img(self, verbose, source_template=None):
         vmname = self.vm.name
 
-        if source_template is not None:
+        if source_template is not None and not self.vm.updateable:
+            # just use template's disk
+            return
+        elif source_template is not None and same_pool(self.vm,
+                                                       source_template):
             self.log.info("Snapshot %s for vm %s"
                           % (source_template.root_img, vmname))
             create_snapshot(source_template.root_img, self.root_img)
@@ -75,7 +79,7 @@ class ThinStorage(QubesVmStorage):
 
     def create_on_disk_private_img(self, verbose, source_template=None):
         vmname = self.vm.name
-        if source_template is not None:
+        if source_template is not None and same_pool(self.vm, source_template):
             self.log.info("Snapshot %s for vm %s"
                           % (source_template.root_img, vmname))
             create_snapshot(source_template.private_img, self.private_img)
@@ -84,12 +88,24 @@ class ThinStorage(QubesVmStorage):
             new_volume(self.thin_pool, self.private_img, self.private_img_size)
 
     def reset_volatile_storage(self, verbose=False, source_template=None):
-        if not os.path.exists(self.volatile_img):
+        if source_template is None:
+            source_template = self.vm.template
+
+        if source_template is not None:
+            if not os.path.exists(self.volatile_img):
+                f_template_root_img = open(source_template.storage.root_img,
+                                           'r')
+                f_template_root_img.seek(0, os.SEEK_END)
+                volatile_img_size = f_template_root_img.tell()
+                new_volume(self.thin_pool,
+                           self.volatile_img,
+                           volatile_img_size)
+        else:
             volatile_img_size = 1024000000  # 1GB
             new_volume(self.thin_pool, self.volatile_img, volatile_img_size)
-        cmd = ['sudo', 'mkswap', '-f', self.volatile_img]
-        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-        self.log.debug(output)
+            cmd = ['sudo', 'mkswap', '-f', self.volatile_img]
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            self.log.debug(output)
 
     def verify_files(self):
         self.log.debug("Verifying files")

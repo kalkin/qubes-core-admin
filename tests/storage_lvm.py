@@ -89,7 +89,7 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
         self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
 
-    def test_001_appvm_image_paths(self):
+    def test_001_appvm_based_on_xen_template(self):
         template = self.qc.get_default_template()
         vm = self.qc.add_new_vm('QubesAppVm', name=self.VM_NAME,
                                 template=template, pool_name=self.POOL_NAME)
@@ -98,6 +98,10 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         self.assertFalse(os.path.exists(self.ROOT_PATH))
         self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
         self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
+
+        vm.start()
+        self.assertEquals(vm.get_power_state(), "Running")
+        vm.shutdown()
 
     def assertEqualsAndExists(self, result_path, expected_path):
         """ Check if the ``result_path``, matches ``expected_path`` and exists.
