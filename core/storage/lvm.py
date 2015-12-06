@@ -73,6 +73,9 @@ class ThinStorage(QubesVmStorage):
             self.log.info("Snapshot %s for vm %s"
                           % (source_template.root_img, vmname))
             create_snapshot(source_template.root_img, self.root_img)
+        elif source_template is not None:
+            new_volume(self.thin_pool, self.root_img, self.root_img_size)
+            self._copy_file(source_template.root_img, self.root_img)
         else:
             self.log.info("Creating empty root img for %s" % vmname)
             new_volume(self.thin_pool, self.root_img, self.root_img_size)
@@ -83,6 +86,10 @@ class ThinStorage(QubesVmStorage):
             self.log.info("Snapshot %s for vm %s"
                           % (source_template.root_img, vmname))
             create_snapshot(source_template.private_img, self.private_img)
+        elif source_template is not None:
+            self.log.info("Importing from another pool for %s" % vmname)
+            new_volume(self.thin_pool, self.private_img, self.private_img_size)
+            self._copy_file(source_template.root_img, self.root_img)
         else:
             self.log.info("Creating empty private img for %s" % vmname)
             new_volume(self.thin_pool, self.private_img, self.private_img_size)
@@ -91,21 +98,27 @@ class ThinStorage(QubesVmStorage):
         if source_template is None:
             source_template = self.vm.template
 
-        if source_template is not None:
-            if not os.path.exists(self.volatile_img):
+        if not os.path.exists(self.volatile_img):
+            if source_template is not None:
                 f_template_root_img = open(source_template.storage.root_img,
                                            'r')
                 f_template_root_img.seek(0, os.SEEK_END)
                 volatile_img_size = f_template_root_img.tell()
-                new_volume(self.thin_pool,
-                           self.volatile_img,
+                new_volume(self.thin_pool, self.volatile_img,
                            volatile_img_size)
-        else:
-            volatile_img_size = 1024000000  # 1GB
-            new_volume(self.thin_pool, self.volatile_img, volatile_img_size)
-            cmd = ['sudo', 'mkswap', '-f', self.volatile_img]
-            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-            self.log.debug(output)
+            else:
+                volatile_img_size = 1024000000  # 1GB
+                new_volume(self.thin_pool, self.volatile_img,
+                           volatile_img_size)
+                cmd = ['sudo', 'parted', self.volatile_img, '--script',
+                       "'mklabel msdos'"]
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+                self.log.debug(output)
+
+                cmd2 = ['sudo', 'parted', self.volatile_img, '--script',
+                        "'mkpart primary 0 -1'"]
+                out2 = subprocess.check_output(cmd2, stderr=subprocess.STDOUT)
+                self.log.debug(out2)
 
     def verify_files(self):
         self.log.debug("Verifying files")
@@ -161,65 +174,19 @@ class ThinStorage(QubesVmStorage):
 
     def clone_disk_files(self, src_vm, verbose):
         if verbose:
-            self.log.info("--> Creating directory: {0}".format(self.vmdir))
+            sys.stderr.write("--> Creating directory: {0}".format(self.vmdir))
         os.mkdir(self.vmdir)
 
-        if same_pool(self.vm, src_vm):
-            self._clone_same_pool(src_vm, verbose)
-        else:
-            self._clone_different_pool(src_vm, verbose)
-
-    def _clone_different_pool(self, src_vm, verbose):
-
-        if src_vm.private_img is not None and self.private_img is not None:
-            if verbose:
-                self.log.info("--> Copying the private image:\n{0} ==>\n{1}".
-                              format(src_vm.private_img, self.private_img))
-            self._copy_file(src_vm.private_img, self.private_img)
-
-        if src_vm.updateable and src_vm.root_img is not None and \
-                self.root_img is not None:
-
-            if verbose:
-                self.log.info("--> Copying the root image:\n{0} ==>\n{1}".
-                              format(src_vm.root_img, self.root_img))
-            self._copy_file(src_vm.root_img, self.root_img)
+        self.create_on_disk_private_img(verbose, source_template=src_vm)
+        self.create_on_disk_root_img(verbose, source_template=src_vm)
 
     def _copy_file(self, source, destination):
         """
         Effective file copy, preserving sparse files etc.
         """
-        # TODO: Windows support
-
-        # We prefer to use Linux's cp, because it nicely handles sparse files
-        retcode = subprocess.call(["sudo", "cp", "--reflink=auto", source,
-                                   destination])
-        if retcode != 0:
-            raise IOError("Error while copying {0} to {1}".
-                          format(source, destination))
-
-    def _clone_same_pool(self, src_vm, verbose):
-        assert same_pool(self.vm, src_vm)
-
-        os.mkdir(self.vmdir)
-        if src_vm.private_img is not None and self.private_img is not None:
-            if verbose:
-                print("--> Snapshotting the private image:\n{0} ==>\n{1}".
-                      format(src_vm.private_img, self.private_img),
-                      file=sys.stderr)
-            create_snapshot(src_vm.private_img, self.private_img)
-
-        if src_vm.updateable and src_vm.root_img is not None and \
-                self.root_img is not None:
-            if verbose:
-                print("--> Copying the root image:\n{0} ==>\n{1}".
-                      format(src_vm.root_img, self.root_img),
-                      file=sys.stderr)
-            if src_vm.storage_type == "file":
-                self._copy_file(src_vm.root_img, self.root_img)
-            else:
-                create_snapshot(src_vm.root_img, self.root_img)
-            # TODO: modules?
+        subprocess.check_output(['sudo', 'dd', 'if=' + source,
+                                 "of=" + destination, 'bs=128M',
+                                 'conv=sparse'])
 
     def commit_template_changes(self):
         pass

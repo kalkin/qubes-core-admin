@@ -66,7 +66,6 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
     POOL_NAME = 'lvm-test-pool'
     ROOT_PATH = '/dev/qubes_dom0/' + VM_NAME + '-root'
     PRIVATE_PATH = '/dev/qubes_dom0/' + VM_NAME + '-private'
-    VOLATILE_PATH = '/dev/qubes_dom0/' + VM_NAME + '-volatile'
 
     def setUp(self):
         """ Add a test lvm thin pool pool """
@@ -80,7 +79,6 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         qubes.storage.remove_pool(self.POOL_NAME)
         remove_volume(self.ROOT_PATH)
         remove_volume(self.PRIVATE_PATH)
-        remove_volume(self.VOLATILE_PATH)
 
     def test_000_hvm_image_paths(self):
         vm = self.qc.add_new_vm('QubesHVm', name=self.VM_NAME,
@@ -88,7 +86,6 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         vm.create_on_disk(verbose=False)
         self.assertEqualsAndExists(vm.root_img, self.ROOT_PATH)
         self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
-        self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
 
     def test_001_appvm_based_on_xen_template(self):
         template = self.qc.get_default_template()
@@ -98,17 +95,18 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         vm.create_on_disk(verbose=False)
         self.assertFalse(os.path.exists(self.ROOT_PATH))
         self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
-        self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
 
         vm.start()
         self.assertEquals(vm.get_power_state(), "Running")
         vm.shutdown()
 
-    def test_002_clone_template(self):
+    def test_002_clone_xen_based_template(self):
         vm = self.clone_vm(self.VM_NAME, self.template)
         self.assertEqualsAndExists(vm.root_img, self.ROOT_PATH)
         self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
-        self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
+        vm.start()
+        self.assertEquals(vm.get_power_state(), "Running")
+        vm.shutdown()
 
     def assertEqualsAndExists(self, result_path, expected_path):
         """ Check if the ``result_path``, matches ``expected_path`` and exists.
