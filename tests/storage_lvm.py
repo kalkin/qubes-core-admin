@@ -72,6 +72,7 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         """ Add a test lvm thin pool pool """
         super(TC_01_LvmThinPool, self).setUp()
         qubes.storage.add_pool(self.POOL_NAME, driver='lvm-thin')
+        self.template = self.qc.get_default_template()
 
     def tearDown(self):
         """ Remove test lvm thin pool """
@@ -103,6 +104,12 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         self.assertEquals(vm.get_power_state(), "Running")
         vm.shutdown()
 
+    def test_002_clone_template(self):
+        vm = self.clone_vm(self.VM_NAME, self.template)
+        self.assertEqualsAndExists(vm.root_img, self.ROOT_PATH)
+        self.assertEqualsAndExists(vm.private_img, self.PRIVATE_PATH)
+        self.assertEqualsAndExists(vm.volatile_img, self.VOLATILE_PATH)
+
     def assertEqualsAndExists(self, result_path, expected_path):
         """ Check if the ``result_path``, matches ``expected_path`` and exists.
 
@@ -114,3 +121,11 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
     def assertExist(self, path):
         """ Assert that the given path exists. """
         self.assertTrue(os.path.exists(path))
+
+    def clone_vm(self, name, template):
+        vm = self.qc.add_new_vm("QubesTemplateVm", template=None, name=name,
+                                pool_name=self.POOL_NAME)
+        vm.clone_attrs(template)
+        vm.clone_disk_files(src_vm=template, verbose=False)
+
+        return vm
