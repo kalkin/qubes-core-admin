@@ -93,7 +93,7 @@ class QubesTemplateVm(QubesResizableVmWithResize2fs):
             assert not self.is_running(), "Attempt to commit changes on running Template VM!"
 
         if verbose:
-            print >> sys.stderr, "--> Commiting template updates... COW: {0}...".format (self.rootcow_img)
+            print >> sys.stderr, "--> Commiting template updates..."
 
         if dry_run:
             return

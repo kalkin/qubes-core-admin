@@ -164,6 +164,44 @@ class ThinStorage(QubesVmStorage):
             self.log.info("--> Creating directory: {0}".format(self.vmdir))
         os.mkdir(self.vmdir)
 
+        if same_pool(self.vm, src_vm):
+            self._clone_same_pool(src_vm, verbose)
+        else:
+            self._clone_different_pool(src_vm, verbose)
+
+    def _clone_different_pool(self, src_vm, verbose):
+
+        if src_vm.private_img is not None and self.private_img is not None:
+            if verbose:
+                self.log.info("--> Copying the private image:\n{0} ==>\n{1}".
+                              format(src_vm.private_img, self.private_img))
+            self._copy_file(src_vm.private_img, self.private_img)
+
+        if src_vm.updateable and src_vm.root_img is not None and \
+                self.root_img is not None:
+
+            if verbose:
+                self.log.info("--> Copying the root image:\n{0} ==>\n{1}".
+                              format(src_vm.root_img, self.root_img))
+            self._copy_file(src_vm.root_img, self.root_img)
+
+    def _copy_file(self, source, destination):
+        """
+        Effective file copy, preserving sparse files etc.
+        """
+        # TODO: Windows support
+
+        # We prefer to use Linux's cp, because it nicely handles sparse files
+        retcode = subprocess.call(["sudo", "cp", "--reflink=auto", source,
+                                   destination])
+        if retcode != 0:
+            raise IOError("Error while copying {0} to {1}".
+                          format(source, destination))
+
+    def _clone_same_pool(self, src_vm, verbose):
+        assert same_pool(self.vm, src_vm)
+
+        os.mkdir(self.vmdir)
         if src_vm.private_img is not None and self.private_img is not None:
             if verbose:
                 print("--> Snapshotting the private image:\n{0} ==>\n{1}".
@@ -182,11 +220,6 @@ class ThinStorage(QubesVmStorage):
             else:
                 create_snapshot(src_vm.root_img, self.root_img)
             # TODO: modules?
-
-        clean_volatile_img = src_vm.dir_path + "/clean-volatile.img.tar"
-        if os.path.exists(clean_volatile_img):
-            self._copy_file(clean_volatile_img,
-                            self.vm.dir_path + "/clean-volatile.img.tar")
 
     def commit_template_changes(self):
         pass
