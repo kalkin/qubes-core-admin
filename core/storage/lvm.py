@@ -33,6 +33,10 @@ from qubes.qubes import QubesException
 from qubes.storage import Pool, QubesVmStorage, StoragePoolException, same_pool
 
 log = logging.getLogger('qubes.lvm')
+log.setLevel(logging.INFO)
+log_h = logging.StreamHandler(sys.stdout)
+log_h.setFormatter(logging.Formatter('%(name)s[%(levelname)s]: %(message)s'))
+log.addHandler(log_h)
 
 
 class ThinStorage(QubesVmStorage):
