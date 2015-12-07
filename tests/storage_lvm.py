@@ -66,6 +66,7 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
     POOL_NAME = 'lvm-test-pool'
     ROOT_PATH = '/dev/qubes_dom0/' + VM_NAME + '-root'
     PRIVATE_PATH = '/dev/qubes_dom0/' + VM_NAME + '-private'
+    VOLATILE_PATH = '/dev/qubes_dom0/' + VM_NAME + '-volatile'
 
     def setUp(self):
         """ Add a test lvm thin pool pool """
@@ -79,6 +80,7 @@ class TC_01_LvmThinPool(SystemTestsMixin, QubesTestCase):
         qubes.storage.remove_pool(self.POOL_NAME)
         remove_volume(self.ROOT_PATH)
         remove_volume(self.PRIVATE_PATH)
+        remove_volume(self.VOLATILE_PATH)
 
     def test_000_hvm_image_paths(self):
         vm = self.qc.add_new_vm('QubesHVm', name=self.VM_NAME,
