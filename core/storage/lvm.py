@@ -185,9 +185,8 @@ class ThinStorage(QubesVmStorage):
         self.create_on_disk_root_img(verbose, source_template=src_vm)
 
     def _copy_file(self, source, destination):
-        """
-        Effective file copy, preserving sparse files etc.
-        """
+        """ Effective file copy, preserving sparse files etc. """
+        self.log.info("Copying file from %s to %s" % (source, destination))
         subprocess.check_output(['sudo', 'dd', 'if=' + source,
                                  "of=" + destination, 'bs=128M',
                                  'conv=sparse'])
