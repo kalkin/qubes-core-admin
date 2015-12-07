@@ -83,13 +83,13 @@ class ThinStorage(QubesVmStorage):
     def create_on_disk_private_img(self, verbose, source_template=None):
         vmname = self.vm.name
         if source_template is not None and same_pool(self.vm, source_template):
-            self.log.info("Snapshot %s for vm %s"
-                          % (source_template.root_img, vmname))
+            self.log.info("Snapshot %s for vm %s" %
+                          (source_template.private_img, vmname))
             create_snapshot(source_template.private_img, self.private_img)
         elif source_template is not None:
             self.log.info("Importing from another pool for %s" % vmname)
             new_volume(self.thin_pool, self.private_img, self.private_img_size)
-            self._copy_file(source_template.root_img, self.root_img)
+            self._copy_file(source_template.private_img, self.private_img)
         else:
             self.log.info("Creating empty private img for %s" % vmname)
             new_volume(self.thin_pool, self.private_img, self.private_img_size)
