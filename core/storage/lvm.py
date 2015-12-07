@@ -39,7 +39,7 @@ class ThinStorage(QubesVmStorage):
 
     def __init__(self, vm, vmdir, thin_pool, **kwargs):
         super(ThinStorage, self).__init__(vm, **kwargs)
-        self.log = logging.getLogger('qubes.lvm.thin-storage')
+        self.log = log
 
         self.thin_pool = thin_pool
 
