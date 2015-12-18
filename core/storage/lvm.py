@@ -59,8 +59,8 @@ class ThinStorage(QubesVmStorage):
                                     self.private_dev, True)
 
     def volatile_dev_config(self):
-        return self.format_disk_dev(self.volatile_img, None,
-                                    self.volatile_dev, True)
+        return self.format_disk_dev(self.volatile_img, None, self.volatile_dev,
+                                    True)
 
     def _volume_path(self, volume):
         return os.path.abspath(
@@ -103,7 +103,7 @@ class ThinStorage(QubesVmStorage):
             source_template = self.vm.template
 
         if not os.path.exists(self.volatile_img):
-            if source_template is not None:
+            if source_template is not None and self.vm.is_appvm():
                 f_template_root_img = open(source_template.storage.root_img,
                                            'r')
                 f_template_root_img.seek(0, os.SEEK_END)
@@ -114,13 +114,14 @@ class ThinStorage(QubesVmStorage):
                 volatile_img_size = 1024000000  # 1GB
                 new_volume(self.thin_pool, self.volatile_img,
                            volatile_img_size)
-                cmd = ['sudo', 'parted', self.volatile_img, '--script',
-                       "'mklabel msdos'"]
+
+                cmd = ['sudo', 'parted', self.volatile_img, 'mklabel', 'msdos',
+                       '--script']
                 output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
                 self.log.debug(output)
 
-                cmd2 = ['sudo', 'parted', self.volatile_img, '--script',
-                        "'mkpart primary 0 -1'"]
+                cmd2 = ['sudo', 'parted', self.volatile_img, 'mkpart',
+                        'primary', '0', '100%', '--script']
                 out2 = subprocess.check_output(cmd2, stderr=subprocess.STDOUT)
                 self.log.debug(out2)
 
