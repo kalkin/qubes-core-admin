@@ -98,12 +98,19 @@ class ThinStorage(QubesVmStorage):
             self.log.info("Creating empty private img for %s" % vmname)
             new_volume(self.thin_pool, self.private_img, self.private_img_size)
 
+    def root_snapshot_config(self, vm):
+        return self.format_disk_dev(self.root_img, None, self.root_dev, True)
+
+    def prepare_for_vm_startup(self, verbose):
+        remove_volume(self.root_img)
+        create_snapshot(self.vm.template.root_img, self.root_img)
+
     def reset_volatile_storage(self, verbose=False, source_template=None):
         if source_template is None:
             source_template = self.vm.template
 
         if not os.path.exists(self.volatile_img):
-            if source_template is not None and self.vm.is_appvm():
+            if source_template is not None and self.vm.is_appvm() and not same_pool(self.vm, source_template):
                 f_template_root_img = open(source_template.storage.root_img,
                                            'r')
                 f_template_root_img.seek(0, os.SEEK_END)
