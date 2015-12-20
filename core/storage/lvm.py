@@ -102,15 +102,18 @@ class ThinStorage(QubesVmStorage):
         return self.format_disk_dev(self.root_img, None, self.root_dev, True)
 
     def prepare_for_vm_startup(self, verbose):
-        remove_volume(self.root_img)
-        create_snapshot(self.vm.template.root_img, self.root_img)
+	self.reset_volatile_storage()
+        if self.vm.is_appvm() and same_pool(self.vm, self.vm.template):
+            remove_volume(self.root_img)
+            create_snapshot(self.vm.template.root_img, self.root_img)
 
     def reset_volatile_storage(self, verbose=False, source_template=None):
         if source_template is None:
             source_template = self.vm.template
 
         if not os.path.exists(self.volatile_img):
-            if source_template is not None and self.vm.is_appvm() and not same_pool(self.vm, source_template):
+            if source_template is not None and self.vm.is_appvm() and \
+                    not same_pool(self.vm, source_template):
                 f_template_root_img = open(source_template.storage.root_img,
                                            'r')
                 f_template_root_img.seek(0, os.SEEK_END)
