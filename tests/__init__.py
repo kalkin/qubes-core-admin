@@ -235,16 +235,23 @@ class SystemTestsMixin(object):
     vm_prefix = 'test-'
 
     def setUp(self):
-        """Set up the test.
+        """Set up the test.  """
+        super(SystemTestsMixin, self).setUp()
+        self.prepare_qubes_collection()
 
+    def tearDown(self):
+        super(SystemTestsMixin, self).tearDown()
+
+        self.release_qubes_collection()
+
+    def prepare_qubes_collection(self):
+        """
         .. warning::
             This method instantiates QubesVmCollection acquires write lock for
             it. You can use is as :py:attr:`qc`. You can (and probably
-            should) release the lock at the end of setUp in subclass
+            should) release the lock at the end of a setUp/setUpClass in
+            subclass.
         """
-
-        super(SystemTestsMixin, self).setUp()
-
         self.qc = qubes.qubes.QubesVmCollection()
         self.qc.lock_db_for_writing()
         self.qc.load()
@@ -253,9 +260,7 @@ class SystemTestsMixin(object):
 
         self._remove_test_vms(self.qc, self.conn)
 
-    def tearDown(self):
-        super(SystemTestsMixin, self).tearDown()
-
+    def release_qubes_collection(self):
         # release the lock, because we have no way to check whether it was
         # read or write lock
         try:
