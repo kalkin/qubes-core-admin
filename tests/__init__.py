@@ -42,7 +42,6 @@ import tempfile
 import unittest
 import unittest.case
 
-import lxml.etree
 import sys
 import pkg_resources
 
