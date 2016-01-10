@@ -49,9 +49,6 @@ import qubes.backup
 import qubes.qubes
 import time
 
-VMPREFIX = 'test-inst-'
-CLSVMPREFIX = 'test-cls-'
-
 
 #: :py:obj:`True` if running in dom0, :py:obj:`False` otherwise
 in_dom0 = False
@@ -234,6 +231,9 @@ class QubesTestCase(unittest.TestCase):
 
 
 class SystemTestsMixin(object):
+
+    vm_prefix = 'test-'
+
     def setUp(self):
         """Set up the test.
 
@@ -276,36 +276,8 @@ class SystemTestsMixin(object):
 
         self.conn.close()
 
-    @classmethod
-    def tearDownClass(cls):
-        super(SystemTestsMixin, cls).tearDownClass()
-
-        qc = qubes.qubes.QubesVmCollection()
-        qc.lock_db_for_reading()
-        qc.load()
-        qc.unlock_db()
-
-        conn = libvirt.open(qubes.qubes.defaults['libvirt_uri'])
-
-        cls._kill_test_vms(qc, prefix=CLSVMPREFIX)
-
-        qc.lock_db_for_writing()
-        qc.load()
-
-        cls._remove_test_vms(qc, conn, prefix=CLSVMPREFIX)
-
-        qc.save()
-        qc.unlock_db()
-        del qc
-
-        conn.close()
-
-    @staticmethod
-    def make_vm_name(name, class_teardown=False):
-        if class_teardown:
-            return CLSVMPREFIX + name
-        else:
-            return VMPREFIX + name
+    def make_vm_name(self, name):
+        return self.vm_prefix + name
 
     def save_and_reload_db(self):
         self.qc.save()
@@ -314,15 +286,15 @@ class SystemTestsMixin(object):
         self.qc.load()
 
     @staticmethod
-    def _kill_test_vms(qc, prefix=VMPREFIX):
+    def _kill_test_vms(qc):
         # do not keep write lock while killing VMs, because that may cause a
         # deadlock with disk hotplug scripts (namely qvm-template-commit
         # called when shutting down TemplateVm)
-        qc.lock_db_for_reading()
-        qc.load()
-        qc.unlock_db()
-        for vm in qc.values():
-            if vm.name.startswith(prefix):
+        self.qc.lock_db_for_reading()
+        self.qc.load()
+        self.qc.unlock_db()
+        for vm in self.qc.values():
+            if vm.name.startswith(self.vm_prefix):
                 if vm.is_running():
                     vm.force_shutdown()
 
@@ -389,16 +361,20 @@ class SystemTestsMixin(object):
         self.save_and_reload_db()
 
     @classmethod
-    def _remove_test_vms(cls, qc, conn, prefix=VMPREFIX):
+    def _remove_test_vms(cls, qc, conn):
         """Aggresively remove any domain that has name in testing namespace.
 
+        .. warning::
+            The test suite hereby claims any domain whose name starts with
+            :py:data:`self.vm_prefix` as fair game. This is needed to enforce sane
+            test executing environment. If you have domains named ``test-*``,
+            don't run the tests.
         """
 
         # first, remove them Qubes-way
-        something_removed = False
-        for vm in qc.values():
-            if vm.name.startswith(prefix):
-                cls._remove_vm_qubes(qc, conn, vm)
+        for vm in self.qc.values():
+            if vm.name.startswith(self.vm_prefix):
+                self._remove_vm_qubes(vm)
                 something_removed = True
         if something_removed:
             qc.save()
@@ -407,9 +383,9 @@ class SystemTestsMixin(object):
             qc.load()
 
         # now remove what was only in libvirt
-        for dom in conn.listAllDomains():
-            if dom.name().startswith(prefix):
-                cls._remove_vm_libvirt(dom)
+        for dom in self.conn.listAllDomains():
+            if dom.name().startswith(self.vm_prefix):
+                self._remove_vm_libvirt(dom)
 
         # finally remove anything that is left on disk
         vmnames = set()
@@ -420,7 +396,7 @@ class SystemTestsMixin(object):
             dirpath = os.path.join(qubes.qubes.system_path['qubes_base_dir'],
                 qubes.qubes.system_path[dirspec])
             for name in os.listdir(dirpath):
-                if name.startswith(prefix):
+                if name.startswith(self.vm_prefix):
                     vmnames.add(name)
         for vmname in vmnames:
             cls._remove_vm_disk(vmname)
