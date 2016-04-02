@@ -102,7 +102,7 @@ class ThinStorage(QubesVmStorage):
         return self.format_disk_dev(self.root_img, None, self.root_dev, True)
 
     def prepare_for_vm_startup(self, verbose):
-	self.reset_volatile_storage()
+        self.reset_volatile_storage()
         if self.vm.is_appvm() and same_pool(self.vm, self.vm.template):
             remove_volume(self.root_img)
             create_snapshot(self.vm.template.root_img, self.root_img)
@@ -231,6 +231,7 @@ def lvm_image_changed(vm):
 
 def thin_pool_exists(name):
     """ Check if given name is an lvm thin volume. """
+    return True  # TODO Implement a fast version of the bellow
     log.debug("Checking if LVM Thin Pool %s exists" % name)
     cmd = ['sudo', 'lvs', '-o',  'data_lv', '--rows', name]
     try:
