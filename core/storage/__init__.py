@@ -278,6 +278,9 @@ class QubesVmStorage(object):
                 format(self.private_img)
             self.create_on_disk_private_img(verbose=False)
 
+    def shutdown(self):
+        raise NotImplementedError
+        
 
 def dump(o):
     """ Returns a string represention of the given object

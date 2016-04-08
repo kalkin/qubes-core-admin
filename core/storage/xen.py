@@ -223,6 +223,8 @@ class XenStorage(QubesVmStorage):
         if self.rootcow_img and not os.path.exists(self.rootcow_img):
             self.commit_template_changes()
 
+    def shutdown(self):
+        pass
 
 class XenPool(Pool):
 

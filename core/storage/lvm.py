@@ -213,6 +213,9 @@ class ThinStorage(QubesVmStorage):
         else:
             return False
 
+    def shutdown(self):
+        if self.vm.is_appvm() and same_pool(self.vm, self.vm.template):
+            remove_volume(self.root_img)
 
 def lvm_image_changed(vm):
     vm_root = vm.root_img

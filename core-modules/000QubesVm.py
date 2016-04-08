@@ -2073,6 +2073,7 @@ class QubesVm(object):
             raise QubesException ("VM already stopped!")
 
         self.libvirt_domain.shutdown()
+        self.storage.shutdown()
 
     def force_shutdown(self, xid = None):
         self.log.debug('force_shutdown()')
