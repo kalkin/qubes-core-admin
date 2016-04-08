@@ -111,29 +111,22 @@ class ThinStorage(QubesVmStorage):
         if source_template is None:
             source_template = self.vm.template
 
-        if not os.path.exists(self.volatile_img):
-            if source_template is not None and self.vm.is_appvm() and \
-                    not same_pool(self.vm, source_template):
-                f_template_root_img = open(source_template.storage.root_img,
-                                           'r')
-                f_template_root_img.seek(0, os.SEEK_END)
-                volatile_img_size = f_template_root_img.tell()
-                new_volume(self.thin_pool, self.volatile_img,
-                           volatile_img_size)
-            else:
-                volatile_img_size = 1024000000  # 1GB
-                new_volume(self.thin_pool, self.volatile_img,
-                           volatile_img_size)
+        if source_template is not None and self.vm.is_appvm() and \
+                not same_pool(self.vm, source_template) and \
+                not os.path.exists(self.volatile_img):
+            f_template_root_img = open(source_template.storage.root_img, 'r')
+            f_template_root_img.seek(0, os.SEEK_END)
+            volatile_img_size = f_template_root_img.tell()
+            new_volume(self.thin_pool, self.volatile_img, volatile_img_size)
+        else:
+            remove_volume(self.volatile_img)
+            volatile_img_size = 1024000000  # 1GB
+            new_volume(self.thin_pool, self.volatile_img, volatile_img_size)
 
-                cmd = ['sudo', 'parted', self.volatile_img, 'mklabel', 'msdos',
-                       '--script']
-                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
-                self.log.debug(output)
-
-                cmd2 = ['sudo', 'parted', self.volatile_img, 'mkpart',
-                        'primary', '0', '100%', '--script']
-                out2 = subprocess.check_output(cmd2, stderr=subprocess.STDOUT)
-                self.log.debug(out2)
+            cmd = ['sudo', 'fdisk', self.volatile_img]
+            p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            p.stdin.write("o\nn\np\n1\n\n\nw")
+            p.communicate()
 
     def verify_files(self):
         self.log.debug("Verifying files")
@@ -216,6 +209,9 @@ class ThinStorage(QubesVmStorage):
     def shutdown(self):
         if self.vm.is_appvm() and same_pool(self.vm, self.vm.template):
             remove_volume(self.root_img)
+
+        remove_volume(self.volatile_img)
+
 
 def lvm_image_changed(vm):
     vm_root = vm.root_img
